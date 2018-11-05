@@ -6,7 +6,6 @@ import nupic_anomaly_output
 true = True
 null = None
 false = False
-undefined = None
 
 
 # canned params provided by nupic
