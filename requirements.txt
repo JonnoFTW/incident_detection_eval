@@ -1,0 +1,7 @@
+git+git://github.com/hokiegeek2/AnomalyDetection.git
+pandas
+numpy
+matplotlib
+nupic
+pymongo
+dask[full]

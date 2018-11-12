@@ -2,12 +2,13 @@ from __future__ import print_function
 from nupic.frameworks.opf.model_factory import ModelFactory
 from nupic.algorithms import anomaly_likelihood
 import nupic_anomaly_output
+from nupic.data.inference_shifter import InferenceShifter
+from util import make_row
+from tqdm import tqdm
 
 true = True
 null = None
 false = False
-undefined = None
-
 
 # canned params provided by nupic
 model_params3 = {
@@ -303,10 +304,9 @@ def get_sensor_encoder(name, maxval=False, buckets=40, max_vehicles=200):
 
 
 threshold = 0.99995
-from nupic.data.inference_shifter import InferenceShifter
 
 
-def run_model(coll, data, location, si, ds):
+def run_model(coll, data, location, si, ds, count):
     name = 'measured_flow'
     MODEL_PARAMS = model_params3
     # MODEL_PARAMS['modelParams']['sensorParams']['encoders'][name] = input_encoder
@@ -317,20 +317,13 @@ def run_model(coll, data, location, si, ds):
     # MODEL_PARAMS['modelParams']['sensorParams']['encoders']['_classifierInput'] = classifier_encoder
     model = ModelFactory.create(MODEL_PARAMS)
     model.enableInference({'predictedField': 'measured_flow'})
-    anomaly_likelihood_helper = anomaly_likelihood.AnomalyLikelihood(historicWindowSize=288*7)
-    si_confs = location['strategic_inputs']
-    # output = nupic_anomaly_output.NuPICPlotOutput(location['site_no'])
-    for row in data:
-        # fetch the
-        datestr = row['datetime'].strftime('%Y%m%d')
+    anomaly_likelihood_helper = anomaly_likelihood.AnomalyLikelihood(historicWindowSize=288 * 7)
 
-        si_conf = next(s for s in si_confs[::-1] if s['date'] <= datestr)
-        to_process = {'datetime': row['datetime']}
-        if ds == 'vs':
-            to_process['measured_flow'] = sum(
-                row['readings'][str(i)] for i in si_conf['si'][si]['sensors'] if row['readings'][str(i)] < 200)
-        else:
-            to_process['measured_flow'] = row['measured_flow']
+    # output = nupic_anomaly_output.NuPICPlotOutput(location['site_no'])
+    prog = tqdm(total=count, desc="HTM")
+    for row in data:
+        to_process = make_row(row, location, ds, si)
+
         result = model.run(to_process)
         result = shifter.shift(result)
         raw_anomaly_score = result.inferences['anomalyScore']
@@ -342,9 +335,15 @@ def run_model(coll, data, location, si, ds):
         # last = to_process['measured_flow']
         # print("raw anomaly:", raw_anomaly_score, "likelihood:", likelihood)
         if likelihood >= threshold:
-            doc = ({'site_no': location['site_no'],
-                    'strategic_input': si,
-                    'algorithm': 'HTM',
-                    'datetime': row['datetime'],
-                    'other': {'likelihood': likelihood, 'score': raw_anomaly_score}})
-            coll.insert_one(doc)
+            try:
+                doc = {'site_no': location['site_no'],
+                       'strategic_input': si,
+                       'algorithm': 'HTM',
+                       'datetime': row['datetime'],
+                       'ds': ds,
+                       'other': {'likelihood': float(likelihood), 'score': float(raw_anomaly_score)}}
+
+                coll.insert_one(doc)
+            except Exception as e:
+                print(e)
+        prog.update()
