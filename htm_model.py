@@ -1,4 +1,7 @@
 from __future__ import print_function
+
+from datetime import timedelta, datetime
+
 from nupic.frameworks.opf.model_factory import ModelFactory
 from nupic.algorithms import anomaly_likelihood
 import nupic_anomaly_output
@@ -317,7 +320,20 @@ def run_model(coll, data, location, si, ds, count):
     # MODEL_PARAMS['modelParams']['sensorParams']['encoders']['_classifierInput'] = classifier_encoder
     model = ModelFactory.create(MODEL_PARAMS)
     model.enableInference({'predictedField': 'measured_flow'})
-    anomaly_likelihood_helper = anomaly_likelihood.AnomalyLikelihood(historicWindowSize=288 * 7)
+    readings_per_week = 288 * 7
+    if ds == 'sm':
+        # get approx readings per week
+        sdate = datetime(2012, 3, 1)
+        readings_per_week = coll.database['scats_sm_small'].find({
+            "site_no": location['site_no'],
+            "strategic_input": int(si),
+            "datetime": {
+                "$gte": sdate,
+                "$lte": sdate + timedelta(days=7)
+            }
+        }).count()
+    print("Readings per week for {}: {}".format(ds, readings_per_week))
+    anomaly_likelihood_helper = anomaly_likelihood.AnomalyLikelihood(historicWindowSize=readings_per_week)
 
     # output = nupic_anomaly_output.NuPICPlotOutput(location['site_no'])
     prog = tqdm(total=count, desc="HTM")
@@ -342,7 +358,7 @@ def run_model(coll, data, location, si, ds, count):
                        'datetime': row['datetime'],
                        'ds': ds,
                        'other': {'likelihood': float(likelihood), 'score': float(raw_anomaly_score)}}
-
+                # print(doc)
                 coll.insert_one(doc)
             except Exception as e:
                 print(e)

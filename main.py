@@ -31,14 +31,16 @@ def cursor_gen(get_cursor):
             pass
 
 
-def get_data(intersection, ds):
+def get_data(intersection, ds, si):
     if ds == 'sm':
         def get_cursor(skip):
-            return db['scats_sm'].find({
+            query = {
                 'site_no': intersection,
-                'datetime': drange},
-                no_cursor_timeout=True).sort(
-                [('sequence', 1)]).skip(skip)
+                'strategic_input': int(si),
+                'datetime': drange
+            }
+            return db['scats_sm_small'].find(query, no_cursor_timeout=True).sort(
+                [("site_no", 1), ("strategic_input", 1), ("datetime", 1), ("sequence", 1)]).skip(skip)
     else:
         def get_cursor(skip):
             return db['scats_readings'].find({
@@ -73,6 +75,6 @@ if __name__ == "__main__":
     parser.add_argument('si', )
     args = parser.parse_args()
     location = get_location(args.intersection)
-    count, data = get_data(args.intersection, args.dataset)
+    count, data = get_data(args.intersection, args.dataset, args.si)
 
     run(data, location, args.method, args.si, args.dataset, count)

@@ -7,12 +7,12 @@ def make_row(row, location, ds, si):
     :param si: the strategic input
     :return: a dict with keys 'datetime' and 'measured_flow'
     """
-    si_confs = location['strategic_inputs']
-    datestr = row['datetime'].strftime('%Y%m%d')
-
-    si_conf = next(s for s in si_confs[::-1] if s['date'] <= datestr)
     to_process = {'datetime': row['datetime']}
     if ds == 'vs':
+        si_confs = location['strategic_inputs']
+        datestr = row['datetime'].strftime('%Y%m%d')
+
+        si_conf = next(s for s in si_confs[::-1] if s['date'] <= datestr)
         to_process['measured_flow'] = sum(
             row['readings'][str(i)] for i in si_conf['si'][si]['sensors'] if row['readings'][str(i)] < 200)
     else:
